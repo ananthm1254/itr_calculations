@@ -1,0 +1,3 @@
+[submodule "sbi-fx-ratekeeper"]
+	path = sbi-fx-ratekeeper
+	url = git@github.com:sahilgupta/sbi-fx-ratekeeper.git
