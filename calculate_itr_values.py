@@ -527,16 +527,28 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             print("\n=== No RSU sales to match ===")
         
         # Process Schedule FA (ESPP-Assets) if sheet exists
-        schedule_fa_results = pd.DataFrame()
-        schedule_fa_summary = None
+        schedule_fa_espp_results = pd.DataFrame()
+        schedule_fa_espp_summary = None
         try:
-            df_schedule_fa = pd.read_excel(input_path, sheet_name='ESPP-Assets')
+            df_schedule_fa_espp = pd.read_excel(input_path, sheet_name='ESPP-Assets')
             print("\n=== Processing Schedule FA (ESPP-Assets) ===")
-            schedule_fa_results, schedule_fa_summary = process_schedule_fa(df_schedule_fa, rates_df, ticker_symbol)
+            schedule_fa_espp_results, schedule_fa_espp_summary = process_schedule_fa(df_schedule_fa_espp, rates_df, ticker_symbol)
         except ValueError:
-            print("\n=== ESPP-Assets sheet not found, skipping Schedule FA ===")
+            print("\n=== ESPP-Assets sheet not found, skipping ESPP Schedule FA ===")
         except Exception as e:
-            print(f"\n=== Error processing Schedule FA: {e} ===")
+            print(f"\n=== Error processing ESPP Schedule FA: {e} ===")
+
+        # Process Schedule FA (RSU-Assets) if sheet exists
+        schedule_fa_rsu_results = pd.DataFrame()
+        schedule_fa_rsu_summary = None
+        try:
+            df_schedule_fa_rsu = pd.read_excel(input_path, sheet_name='RSU-Assets')
+            print("\n=== Processing Schedule FA (RSU-Assets) ===")
+            schedule_fa_rsu_results, schedule_fa_rsu_summary = process_schedule_fa(df_schedule_fa_rsu, rates_df, ticker_symbol)
+        except ValueError:
+            print("\n=== RSU-Assets sheet not found, skipping RSU Schedule FA ===")
+        except Exception as e:
+            print(f"\n=== Error processing RSU Schedule FA: {e} ===")
 
         
     except Exception as e:
@@ -614,24 +626,46 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
         print(f"    - Short Term (STCG):  ₹{total_stcg:>15,.2f}")
         print(f"{'='*60}")
     
-    # Schedule FA Summary
-    if schedule_fa_summary:
+    # Schedule FA Summary - ESPP
+    if schedule_fa_espp_summary:
         print(f"\n{'='*60}")
-        print(f"SCHEDULE FA SUMMARY (Foreign Assets)")
+        print(f"SCHEDULE FA SUMMARY - ESPP (Foreign Assets)")
         print(f"{'='*60}")
-        print(f"Opening Date:             {schedule_fa_summary['Opening Date']}")
-        print(f"Opening Value (INR):      ₹{schedule_fa_summary['Opening Value (INR)']:>15,.2f}")
-        print(f"Closing Date:             {schedule_fa_summary['Closing Date']}")
-        print(f"Closing Value (INR):      ₹{schedule_fa_summary['Closing Value (INR)']:>15,.2f}")
-        print(f"Total Shares:             {schedule_fa_summary['Total Shares']:>18,.2f}")
+        print(f"Opening Date:             {schedule_fa_espp_summary['Opening Date']}")
+        print(f"Opening Value (INR):      ₹{schedule_fa_espp_summary['Opening Value (INR)']:>15,.2f}")
+        print(f"Closing Date:             {schedule_fa_espp_summary['Closing Date']}")
+        print(f"Closing Value (INR):      ₹{schedule_fa_espp_summary['Closing Value (INR)']:>15,.2f}")
+        print(f"Total Shares:             {schedule_fa_espp_summary['Total Shares']:>18,.2f}")
         print(f"{'-'*60}")
-        print(f"Positive Cash (USD):      ${schedule_fa_summary['Positive Cash Total (USD)']:>15,.2f}")
-        print(f"Positive Cash (INR):      ₹{schedule_fa_summary['Positive Cash Total (INR)']:>15,.2f}")
+        print(f"Positive Cash (USD):      ${schedule_fa_espp_summary['Positive Cash Total (USD)']:>15,.2f}")
+        print(f"Positive Cash (INR):      ₹{schedule_fa_espp_summary['Positive Cash Total (INR)']:>15,.2f}")
         print(f"{'-'*60}")
-        if schedule_fa_summary['Peak Date'] != 'N/A':
-            print(f"Peak Date:                {schedule_fa_summary['Peak Date']}")
-            print(f"Peak Price (USD):         ${schedule_fa_summary['Peak Price (USD)']:>15,.2f}")
-            print(f"Peak Value (INR):         ₹{schedule_fa_summary['Peak Value (INR)']:>15,.2f}")
+        if schedule_fa_espp_summary['Peak Date'] != 'N/A':
+            print(f"Peak Date:                {schedule_fa_espp_summary['Peak Date']}")
+            print(f"Peak Price (USD):         ${schedule_fa_espp_summary['Peak Price (USD)']:>15,.2f}")
+            print(f"Peak Value (INR):         ₹{schedule_fa_espp_summary['Peak Value (INR)']:>15,.2f}")
+        else:
+            print(f"Peak Value:               Not calculated (yfinance not available)")
+        print(f"{'='*60}")
+    
+    # Schedule FA Summary - RSU
+    if schedule_fa_rsu_summary:
+        print(f"\n{'='*60}")
+        print(f"SCHEDULE FA SUMMARY - RSU (Foreign Assets)")
+        print(f"{'='*60}")
+        print(f"Opening Date:             {schedule_fa_rsu_summary['Opening Date']}")
+        print(f"Opening Value (INR):      ₹{schedule_fa_rsu_summary['Opening Value (INR)']:>15,.2f}")
+        print(f"Closing Date:             {schedule_fa_rsu_summary['Closing Date']}")
+        print(f"Closing Value (INR):      ₹{schedule_fa_rsu_summary['Closing Value (INR)']:>15,.2f}")
+        print(f"Total Shares:             {schedule_fa_rsu_summary['Total Shares']:>18,.2f}")
+        print(f"{'-'*60}")
+        print(f"Positive Cash (USD):      ${schedule_fa_rsu_summary['Positive Cash Total (USD)']:>15,.2f}")
+        print(f"Positive Cash (INR):      ₹{schedule_fa_rsu_summary['Positive Cash Total (INR)']:>15,.2f}")
+        print(f"{'-'*60}")
+        if schedule_fa_rsu_summary['Peak Date'] != 'N/A':
+            print(f"Peak Date:                {schedule_fa_rsu_summary['Peak Date']}")
+            print(f"Peak Price (USD):         ${schedule_fa_rsu_summary['Peak Price (USD)']:>15,.2f}")
+            print(f"Peak Value (INR):         ₹{schedule_fa_rsu_summary['Peak Value (INR)']:>15,.2f}")
         else:
             print(f"Peak Value:               Not calculated (yfinance not available)")
         print(f"{'='*60}")
@@ -651,13 +685,19 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             if not rsu_matched.empty:
                 rsu_matched.to_excel(writer, sheet_name='RSU_Matched_Transactions', index=False)
             
-            # Add Schedule FA if available
-            if not schedule_fa_results.empty:
-                schedule_fa_results.to_excel(writer, sheet_name='Schedule_FA_Details', index=False)
-            if schedule_fa_summary:
-                # Create a summary DataFrame
-                summary_df = pd.DataFrame([schedule_fa_summary])
-                summary_df.to_excel(writer, sheet_name='Schedule_FA_Summary', index=False)
+            # Add Schedule FA - ESPP if available
+            if not schedule_fa_espp_results.empty:
+                schedule_fa_espp_results.to_excel(writer, sheet_name='Schedule_FA_ESPP_Details', index=False)
+            if schedule_fa_espp_summary:
+                summary_df = pd.DataFrame([schedule_fa_espp_summary])
+                summary_df.to_excel(writer, sheet_name='Schedule_FA_ESPP_Summary', index=False)
+            
+            # Add Schedule FA - RSU if available
+            if not schedule_fa_rsu_results.empty:
+                schedule_fa_rsu_results.to_excel(writer, sheet_name='Schedule_FA_RSU_Details', index=False)
+            if schedule_fa_rsu_summary:
+                summary_df = pd.DataFrame([schedule_fa_rsu_summary])
+                summary_df.to_excel(writer, sheet_name='Schedule_FA_RSU_Summary', index=False)
         
         print(f"\n✓ Successfully saved calculated data to: {output_path}")
         print(f"  - Dividend_Calculated: {len(dividend_results)} rows")
@@ -669,10 +709,14 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             print(f"  - ESPP_Matched_Transactions: {len(espp_matched)} rows")
         if not rsu_matched.empty:
             print(f"  - RSU_Matched_Transactions: {len(rsu_matched)} rows")
-        if not schedule_fa_results.empty:
-            print(f"  - Schedule_FA_Details: {len(schedule_fa_results)} rows")
-        if schedule_fa_summary:
-            print(f"  - Schedule_FA_Summary: 1 row")
+        if not schedule_fa_espp_results.empty:
+            print(f"  - Schedule_FA_ESPP_Details: {len(schedule_fa_espp_results)} rows")
+        if schedule_fa_espp_summary:
+            print(f"  - Schedule_FA_ESPP_Summary: 1 row")
+        if not schedule_fa_rsu_results.empty:
+            print(f"  - Schedule_FA_RSU_Details: {len(schedule_fa_rsu_results)} rows")
+        if schedule_fa_rsu_summary:
+            print(f"  - Schedule_FA_RSU_Summary: 1 row")
     except Exception as e:
         print(f"Error saving output file: {e}")
         import traceback
