@@ -1,166 +1,84 @@
 # ITR Calculations - Foreign Assets Tax Calculator
 
-A comprehensive Python tool for calculating Income Tax Return (ITR) values for foreign assets, including dividends, ESPP, RSU, and Schedule FA reporting. Automatically converts USD to INR using SBI TT Buy rates with proper date-based exchange rate lookup.
+Python tool for calculating ITR values for foreign assets (dividends, ESPP, RSU, Schedule FA). Automatically converts USD to INR using SBI TT Buy rates.
 
 ## Table of Contents
 - [Features](#features)
 - [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Detailed Usage](#detailed-usage)
-- [Input File Format](#input-file-format)
-- [Output Files](#output-files)
-- [Command Line Options](#command-line-options)
-- [Calculations Explained](#calculations-explained)
+- [Usage](#usage)
+- [Input Format](#input-format)
+- [Output](#output)
+- [Calculations](#calculations)
 - [Troubleshooting](#troubleshooting)
-- [Examples](#examples)
 
 ---
 
 ## Features
 
-### 💰 Dividend Income Calculation
-- Converts foreign dividend income and tax to INR
-- Uses SBI TT Buy rate from the last day of preceding month
-- Automatically handles date-based exchange rate lookup
-
-### 📊 ESPP (Employee Stock Purchase Plan)
-- **Buy Transactions**: Converts purchase prices to INR
-- **Sale Transactions**: Converts sale proceeds to INR
-- **FIFO Matching**: Automatically matches sales to purchases
-- **Capital Gains**: Calculates LTCG (>24 months) and STCG (<24 months)
-
-### 🎁 RSU (Restricted Stock Units)
-- **Vest Transactions**: Converts vesting values to INR
-- **Sale Transactions**: Converts sale proceeds to INR
-- **FIFO Matching**: Automatically matches sales to vests
-- **Capital Gains**: Calculates LTCG and STCG with holding period
-
-### 📋 Schedule FA (Foreign Assets)
-- **Opening & Closing Values**: Converts portfolio values to INR
-- **Peak Value Calculation**: Finds maximum portfolio value during the year
-  - Tracks daily share balances
-  - Fetches historical stock prices
-  - Calculates: `max(Daily Stock Price × Shares Held)`
-- **Positive Cash Summary**: Totals all deposits/credits in INR
-
-### 🔄 Smart Exchange Rate Lookup
-- Uses SBI TT Buy rates from `sbi-fx-ratekeeper` repository
-- Reference date: Last day of preceding month
-- Falls back to nearest available rate if exact date missing
-- Handles weekends and holidays automatically
+- **Dividend Income**: Converts foreign dividends and tax to INR using SBI TT Buy rate from last day of preceding month
+- **ESPP/RSU**: Processes buy/vest and sale transactions with FIFO matching
+- **Capital Gains**: Calculates LTCG (≥24 months) and STCG (<24 months)
+- **Schedule FA**: 
+  - Opening/Closing portfolio values in INR
+  - Peak value calculation (max daily portfolio value during year)
+  - Positive cash summary
+- **Smart Exchange Rates**: Auto-fallback to nearest date for weekends/holidays
 
 ---
 
 ## Installation
 
-### Prerequisites
-- Python 3.7 or higher
-- pip (Python package manager)
+**Prerequisites**: Python 3.7+
 
-### Step 1: Clone or Download
 ```bash
-cd your-workspace-directory
-git clone <your-repo-url>
-cd itr_calculations
-```
-
-### Step 2: Install Dependencies
-```bash
+# Install dependencies
 python -m pip install pandas openpyxl python-dateutil yfinance
-```
 
-**Required packages:**
-- `pandas` - Data processing
-- `openpyxl` - Excel file handling
-- `python-dateutil` - Date calculations
-- `yfinance` - Stock price data (optional, for peak value calculation)
-
-### Step 3: Verify Installation
-```bash
+# Verify installation
 python calculate_itr_values.py --help
 ```
 
-You should see the help message with available options.
+**Required**: `sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv` in same directory
 
 ---
 
-## Quick Start
+## Usage
 
-### Basic Usage (Default Files)
 ```bash
+# Basic usage (default files)
 python calculate_itr_values.py
+
+# Custom files and ticker
+python calculate_itr_values.py -i FY2023-24.xlsx -o Results.xlsx -t AAPL
 ```
 
-This will:
-1. Read `ITR_Foreign_Assets.xlsx`
-2. Use exchange rates from `sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv`
-3. Generate `ITR_Calculated_Values.xlsx`
-
-### Custom Files
-```bash
-python calculate_itr_values.py -i my_assets.xlsx -o my_results.xlsx
-```
-
-### Custom Stock Ticker (for Schedule FA)
-```bash
-python calculate_itr_values.py -t AAPL
-```
+**Options**:
+- `-i FILE` - Input Excel file (default: `ITR_Foreign_Assets.xlsx`)
+- `-o FILE` - Output Excel file (default: `ITR_Calculated_Values.xlsx`)
+- `-t TICKER` - Stock ticker for peak value (default: `MU`)
 
 ---
 
-## Detailed Usage
+## Input Format
 
-### Input File Structure
+Input Excel file should contain these sheets:
 
-Your input Excel file (`ITR_Foreign_Assets.xlsx`) should contain the following sheets:
-
-#### 1. **Dividend_FY** Sheet
-Columns:
-- `Date of Dividend` - Transaction date (DD/MM/YYYY)
-- `Value (in $)` - Dividend amount in USD
-- `Tax (in $)` - Tax withheld in USD
-
-Example:
+### 1. Dividend_FY
 ```
 Date of Dividend | Value (in $) | Tax (in $)
 23/10/2024      | 1.79         | 0.45
-15/01/2025      | 1.79         | 0.45
 ```
 
-#### 2. **ESPP-Buy** Sheet
-Columns:
-- `Transaction date` - Purchase date (DD/MM/YYYY)
-- `Purchase/Sale FMV (in $)` - Fair Market Value per share
-- `No. of Shares` - Number of shares purchased
-
-Example:
+### 2. ESPP-Buy / ESPP-Sale
 ```
 Transaction date | Purchase/Sale FMV (in $) | No. of Shares
 31/01/2022      | 79.27                    | 14.000
-29/07/2022      | 62.07                    | 17.674
 ```
 
-#### 3. **ESPP-Sale** Sheet
-Same columns as ESPP-Buy, but for sale transactions.
+### 3. RSU-Vest / RSU-Sale
+Same format as ESPP sheets.
 
-#### 4. **RSU-Vest** Sheet
-Columns:
-- `Transaction date` - Vesting date (DD/MM/YYYY)
-- `Purchase/Sale FMV (in $)` - Fair Market Value per share
-- `No. of Shares` - Number of shares vested
-
-#### 5. **RSU-Sale** Sheet
-Same columns as RSU-Vest, but for sale transactions.
-
-#### 6. **ESPP-Assets** Sheet (for Schedule FA)
-Columns:
-- `Date` - Transaction date
-- `Cash/Share` - Type: "Opening", "Closing", "Share", or "Cash"
-- `No. of Shares` - Number of shares (for Opening/Share rows)
-- `Cash (in $)` - Cash amount (for Cash rows)
-- `Market Value (in $)` - Portfolio value (for Opening/Closing rows)
-
-Example:
+### 4. ESPP-Assets (Schedule FA)
 ```
 Date       | Cash/Share | No. of Shares | Cash (in $) | Market Value (in $)
 01/01/2023 | Opening    | 31.674        |             | 1583.07
@@ -169,313 +87,116 @@ Date       | Cash/Share | No. of Shares | Cash (in $) | Market Value (in $)
 31/12/2023 | Closing    | 66.225        |             | 5678.90
 ```
 
-**Row Types:**
-- **Opening**: Portfolio value at start of year
-- **Closing**: Portfolio value at end of year
-- **Share**: Share additions (vesting, purchases)
-- **Cash**: Cash transactions (positive = deposits, negative = fees)
+**Row Types**: Opening (year start), Closing (year end), Share (additions), Cash (deposits/fees)
+
+**Date Format**: DD/MM/YYYY
 
 ---
 
-## Output Files
+## Output
 
-### Generated Excel File: `ITR_Calculated_Values.xlsx`
+Generated file `ITR_Calculated_Values.xlsx` contains:
 
-Contains multiple sheets:
-
-#### 1. **Dividend_Calculated**
-- Transaction Date
-- Reference Date (Month End)
-- SBI Rate Date
-- SBI TT Buy Rate
-- Value (Foreign) & Value (INR)
-- Tax (Foreign) & Tax (INR)
-
-#### 2. **ESPP_Buy_Calculated**
-- Transaction Date
-- Reference Date
-- SBI TT Buy Rate
-- FMV per Share (USD & INR)
-- Total Purchase Price (USD & INR)
-
-#### 3. **ESPP_Sale_Calculated**
-- Similar to Buy, but for sales
-
-#### 4. **ESPP_Matched_Transactions**
-- Sale Date & Purchase Date
-- Holding Period (Days & Months)
-- Gain Type (LTCG or STCG)
-- Shares Sold
-- Purchase & Sale Prices
-- Capital Gain/Loss (INR)
-- LTCG (INR) & STCG (INR)
-
-#### 5. **RSU_Vest_Calculated** & **RSU_Sale_Calculated**
-- Similar to ESPP sheets
-
-#### 6. **RSU_Matched_Transactions**
-- Similar to ESPP matched transactions
-
-#### 7. **Schedule_FA_Details**
-- All ESPP-Assets transactions with INR conversions
-
-#### 8. **Schedule_FA_Summary**
-- Opening Date & Value (INR)
-- Closing Date & Value (INR)
-- Total Shares
-- Positive Cash Total (USD & INR)
-- Peak Date, Price, & Value (INR)
+1. **Dividend_Calculated** - Dividends with INR conversion
+2. **ESPP_Buy_Calculated** / **ESPP_Sale_Calculated** - Transactions with exchange rates
+3. **ESPP_Matched_Transactions** - FIFO-matched sales with capital gains (LTCG/STCG)
+4. **RSU_Vest_Calculated** / **RSU_Sale_Calculated** / **RSU_Matched_Transactions** - Same as ESPP
+5. **Schedule_FA_Details** - All asset transactions in INR
+6. **Schedule_FA_Summary** - Opening, Closing, Peak values, and Positive Cash Total
 
 ---
 
-## Command Line Options
+## Calculations
 
-```bash
-python calculate_itr_values.py [OPTIONS]
-```
+### Exchange Rate
+- **Reference Date**: Last day of preceding month
+- **Example**: Transaction on 15/01/2025 → uses rate for 31/12/2024
+- **Fallback**: Nearest preceding date if exact date unavailable
 
-### Options:
+### Capital Gains
+- **LTCG**: Holding ≥24 months (taxed at 10% if >₹1 lakh)
+- **STCG**: Holding <24 months (taxed at slab rates)
+- **Holding Period**: `(Sale Date - Purchase Date) / 30.44` months
 
-| Option | Long Form | Description | Default |
-|--------|-----------|-------------|---------|
-| `-h` | `--help` | Show help message | - |
-| `-i FILE` | `--input FILE` | Input Excel file path | `ITR_Foreign_Assets.xlsx` |
-| `-o FILE` | `--output FILE` | Output Excel file path | `ITR_Calculated_Values.xlsx` |
-| `-t TICKER` | `--ticker TICKER` | Stock ticker for peak value | `MU` |
-
-### Examples:
-
-```bash
-# Use default files
-python calculate_itr_values.py
-
-# Custom input file
-python calculate_itr_values.py -i FY2023-24.xlsx
-
-# Custom input and output
-python calculate_itr_values.py -i FY2023-24.xlsx -o Results_2023-24.xlsx
-
-# Different stock ticker
-python calculate_itr_values.py -t AAPL
-
-# All options combined
-python calculate_itr_values.py -i assets.xlsx -o results.xlsx -t MSFT
-```
-
----
-
-## Calculations Explained
-
-### 1. Exchange Rate Lookup
-
-**Reference Date**: Last day of preceding month
-
-Example:
-- Transaction Date: 15/01/2025
-- Reference Date: 31/12/2024
-- Uses SBI TT Buy rate for 31/12/2024
-
-**Fallback Logic**:
-- If exact date not found (weekend/holiday), uses nearest preceding date
-- Skips rates with value 0.00
-
-### 2. Capital Gains Classification
-
-**Long-Term Capital Gains (LTCG)**:
-- Holding period ≥ 24 months
-- Taxed at 10% (without indexation) if gains > ₹1 lakh
-
-**Short-Term Capital Gains (STCG)**:
-- Holding period < 24 months
-- Taxed at applicable slab rates
-
-**Holding Period Calculation**:
-```
-Holding Period (months) = (Sale Date - Purchase Date) in days / 30.44
-```
-
-### 3. FIFO Matching
-
-Sales are matched to purchases/vests using First-In-First-Out:
-
-Example:
-```
-Purchases:
-- 2022-01-31: 14 shares @ $79.27
-- 2022-07-29: 18 shares @ $62.07
-
-Sale:
-- 2024-03-25: 20 shares @ $119.50
-
-Matching:
-- 14 shares from 2022-01-31 purchase
-- 6 shares from 2022-07-29 purchase
-```
-
-### 4. Peak Value Calculation
-
-**Algorithm**:
-1. Build share timeline (track when shares were added)
-2. For each trading day in the year:
-   - Get stock closing price
-   - Determine shares held on that date
-   - Calculate: `Portfolio Value = Price × Shares`
-3. Find the maximum value across all days
-4. Convert to INR using that date's exchange rate
+### FIFO Matching
+Sales matched to earliest purchases/vests first.
 
 **Example**:
 ```
-Timeline:
-- Jan 1: 30 shares @ $100 = $3,000
-- Feb 1: 50 shares @ $90 = $4,500 (added 20 shares)
-- Mar 1: 50 shares @ $95 = $4,750 ← PEAK
-- Dec 31: 50 shares @ $85 = $4,250
-
-Peak Value: $4,750 on Mar 1
+Purchases: 14 shares (2022-01-31), 18 shares (2022-07-29)
+Sale: 20 shares (2024-03-25)
+→ Matches: 14 from first purchase, 6 from second
 ```
+
+### Peak Value
+1. Track daily share balances
+2. Fetch daily stock prices for the year
+3. Calculate: `max(Daily Price × Shares Held)`
+4. Convert to INR using peak date's exchange rate
 
 ---
 
 ## Troubleshooting
 
-### Issue: "Excel file not found"
-**Solution**: Ensure `ITR_Foreign_Assets.xlsx` is in the same directory, or use `-i` to specify path.
+| Issue | Solution |
+|-------|----------|
+| Excel file not found | Ensure file exists or use `-i` option |
+| CSV file not found | Verify `sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv` exists |
+| yfinance not installed | Run `python -m pip install yfinance` (optional, for peak value) |
+| No exchange rate found | Check CSV has data for your dates; script uses nearest preceding rate |
+| Incorrect peak value | Verify ESPP-Assets sheet format and ticker symbol (`-t` option) |
+| Console encoding errors | Cosmetic only; Excel file has correct values |
 
-### Issue: "CSV file not found"
-**Solution**: Ensure `sbi-fx-ratekeeper` folder exists with the CSV file at:
-```
-sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv
-```
+---
 
-### Issue: "yfinance not installed" warning
-**Solution**: Install yfinance for peak value calculation:
-```bash
-python -m pip install yfinance
-```
-Peak value will be skipped if yfinance is not available.
+## Tax Filing Reference (ITR-2)
 
-### Issue: "No exchange rate found"
-**Solution**: 
-- Check if SBI CSV has data for your transaction dates
-- Ensure dates are in DD/MM/YYYY format
-- The script will use the nearest preceding available rate
+**Schedule FA**:
+- Opening/Closing/Peak Balance: From Schedule_FA_Summary
+- Total Investment: Positive Cash Total (INR)
 
-### Issue: Incorrect peak value
-**Solution**:
-- Verify ESPP-Assets sheet has correct Opening/Share/Closing rows
-- Check stock ticker symbol is correct (use `-t` option)
-- Ensure dates are in correct format
+**Schedule CG**:
+- Long-term gains: Sum LTCG (INR) from matched transactions
+- Short-term gains: Sum STCG (INR) from matched transactions
 
-### Issue: Character encoding errors in console
-**Solution**: This is cosmetic only. The Excel file will have correct values. You can ignore Rupee symbol (₹) display issues in console.
+**Schedule OS (Dividend)**:
+- Gross Dividend: Sum Value (INR) from Dividend_Calculated
+- Foreign Tax Paid: Sum Tax (INR) from Dividend_Calculated
 
 ---
 
 ## Examples
 
-### Example 1: Basic Dividend Calculation
-
-**Input** (Dividend_FY sheet):
+### Dividend Calculation
 ```
-Date of Dividend | Value (in $) | Tax (in $)
-15/01/2025      | 1.79         | 0.45
+Input: 15/01/2025, $1.79 dividend, $0.45 tax
+Process: Reference 31/12/2024, Rate 85.20
+Output: ₹152.51 dividend, ₹38.34 tax
 ```
 
-**Process**:
-1. Reference Date: 31/12/2024
-2. SBI TT Buy Rate: 85.20
-3. Value (INR) = 1.79 × 85.20 = ₹152.51
-4. Tax (INR) = 0.45 × 85.20 = ₹38.34
-
-### Example 2: ESPP Capital Gains
-
-**Input**:
+### ESPP Capital Gains
 ```
-Buy:  31/01/2022, 14 shares @ $79.27
+Buy: 31/01/2022, 14 shares @ $79.27
 Sale: 25/03/2024, 14 shares @ $119.50
+Result: 25.8 months → LTCG of ₹55,827
 ```
 
-**Process**:
-1. Holding Period = 25.8 months → LTCG
-2. Purchase (Jan 2022): Rate = 74.15, Cost = ₹82,179
-3. Sale (Mar 2024): Rate = 82.75, Proceeds = ₹138,006
-4. Capital Gain = ₹55,827 (LTCG)
-
-### Example 3: Schedule FA Peak Value
-
-**Input** (ESPP-Assets):
+### Peak Value
 ```
-01/01/2023 | Opening | 31.67 shares | Market Value: $1,583
-31/01/2023 | Share   | 17.15 shares added
-31/12/2023 | Closing | 66.22 shares | Market Value: $5,679
+Timeline: Jan 1 (30 shares @ $100), Feb 1 (50 shares @ $90), 
+          Mar 1 (50 shares @ $95 ← PEAK), Dec 31 (50 shares @ $85)
+Peak: $4,750 on Mar 1
 ```
-
-**Process**:
-1. Fetch MU stock prices for 2023
-2. For each day, calculate: Price × Shares held
-3. Peak found: 26/12/2023, Price $86.33, Shares 66.22
-4. Peak Value = $5,716 = ₹4,73,190
-
----
-
-## Tax Filing Reference
-
-### For ITR-2 Form
-
-**Schedule FA (Foreign Assets)**:
-- Opening Balance: Use "Opening Value (INR)"
-- Closing Balance: Use "Closing Value (INR)"
-- Peak Balance: Use "Peak Value (INR)"
-- Total Investment: Use "Positive Cash Total (INR)"
-
-**Schedule CG (Capital Gains)**:
-- Long-term gains: Sum of all LTCG (INR) from matched transactions
-- Short-term gains: Sum of all STCG (INR) from matched transactions
-
-**Schedule OS (Other Sources - Dividend)**:
-- Gross Dividend: Sum of all "Value (INR)" from Dividend_Calculated
-- Foreign Tax Paid: Sum of all "Tax (INR)" from Dividend_Calculated
 
 ---
 
 ## Notes
 
-1. **Date Format**: Always use DD/MM/YYYY in Excel
-2. **Decimal Precision**: Values rounded to 2 decimal places
-3. **Currency**: All foreign amounts assumed to be in USD
-4. **Tax Year**: Based on transaction dates in your input file
-5. **FIFO**: Cannot be changed; required by Indian tax law
-6. **Backup**: Always keep a copy of your input Excel file
-
----
-
-## Support
-
-For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Verify your input file format matches the examples
-3. Review the console output for specific error messages
-4. Check the generated Excel file for detailed calculations
-
----
-
-## License
-
-Personal use only. Not for commercial distribution.
-
----
-
-## Changelog
-
-### Latest Version
-- ✅ Dividend income calculation with INR conversion
-- ✅ ESPP buy/sell processing with FIFO matching
-- ✅ RSU vest/sale processing with FIFO matching
-- ✅ LTCG/STCG classification (24-month threshold)
-- ✅ Schedule FA with peak value calculation
-- ✅ Command-line arguments support
-- ✅ Automatic exchange rate fallback
-- ✅ Comprehensive Excel output with multiple sheets
+- **Date Format**: DD/MM/YYYY
+- **Currency**: USD only
+- **FIFO**: Required by Indian tax law
+- **Precision**: 2 decimal places
+- **Backup**: Keep copy of input file
 
 ---
 
