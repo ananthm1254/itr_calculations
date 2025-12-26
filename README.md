@@ -38,7 +38,7 @@ python -m pip install pandas openpyxl python-dateutil yfinance
 python calculate_itr_values.py --help
 ```
 
-**Required**: `sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv` in same directory
+**Note**: The tool automatically fetches the latest SBI exchange rates from GitHub. No additional setup required.
 
 ---
 
@@ -141,9 +141,9 @@ Sale: 20 shares (2024-03-25)
 | Issue | Solution |
 |-------|----------|
 | Excel file not found | Ensure file exists or use `-i` option |
-| CSV file not found | Verify `sbi-fx-ratekeeper/csv_files/SBI_REFERENCE_RATES_USD.csv` exists |
+| Network error fetching rates | Check internet connection; rates are fetched from GitHub |
 | yfinance not installed | Run `python -m pip install yfinance` (optional, for peak value) |
-| No exchange rate found | Check CSV has data for your dates; script uses nearest preceding rate |
+| No exchange rate found | Script uses nearest preceding rate; check your transaction dates |
 | Incorrect peak value | Verify ESPP-Assets sheet format and ticker symbol (`-t` option) |
 | Console encoding errors | Cosmetic only; Excel file has correct values |
 

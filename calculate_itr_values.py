@@ -4,6 +4,8 @@ from pathlib import Path
 import os
 import argparse
 import sys
+import urllib.request
+import io
 try:
     import yfinance as yf
     YFINANCE_AVAILABLE = True
@@ -11,11 +13,30 @@ except ImportError:
     YFINANCE_AVAILABLE = False
     print("Warning: yfinance not installed. Peak value calculation will be skipped.")
 
-# Paths
+# Paths and URLs
 BASE_DIR = Path(r"c:\Users\anant\OneDrive\Documents\itr_calculations")
 EXCEL_PATH = BASE_DIR / "ITR_Foreign_Assets.xlsx"
-CSV_PATH = BASE_DIR / "sbi-fx-ratekeeper" / "csv_files" / "SBI_REFERENCE_RATES_USD.csv"
 OUTPUT_PATH = BASE_DIR / "ITR_Calculated_Values.xlsx"
+SBI_RATES_URL = "https://raw.githubusercontent.com/sahilgupta/sbi-fx-ratekeeper/main/csv_files/SBI_REFERENCE_RATES_USD.csv"
+
+def load_sbi_rates():
+    """
+    Load SBI exchange rates from GitHub URL.
+    Returns a DataFrame with DATE and TT BUY columns.
+    """
+    try:
+        print(f"Fetching SBI rates from GitHub...")
+        with urllib.request.urlopen(SBI_RATES_URL) as response:
+            csv_data = response.read().decode('utf-8')
+        
+        rates_df = pd.read_csv(io.StringIO(csv_data))
+        rates_df['DATE'] = pd.to_datetime(rates_df['DATE'], format='%Y-%m-%d %H:%M')
+        rates_df['TT BUY'] = pd.to_numeric(rates_df['TT BUY'], errors='coerce').fillna(0.0)
+        print(f"Successfully loaded {len(rates_df)} exchange rates")
+        return rates_df
+    except Exception as e:
+        print(f"Error loading SBI rates from GitHub: {e}")
+        raise
 
 def get_last_day_of_preceding_month(date_val):
     """
@@ -446,21 +467,16 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
     if not input_path.exists():
         print(f"Error: Excel file not found at {input_path}")
         return
-    if not CSV_PATH.exists():
-        print(f"Error: CSV file not found at {CSV_PATH}")
-        return
 
     print(f"Input file: {input_path}")
     print(f"Output file: {output_path}")
     
-    # 1. Load Rates
-    print(f"\nLoading rates from {CSV_PATH.name}...")
+    # 1. Load Rates from GitHub
+    print(f"\nLoading SBI exchange rates...")
     try:
-        rates_df = pd.read_csv(CSV_PATH)
-        rates_df['DATE'] = pd.to_datetime(rates_df['DATE'], format='%Y-%m-%d %H:%M')
-        rates_df['TT BUY'] = pd.to_numeric(rates_df['TT BUY'], errors='coerce').fillna(0.0)
+        rates_df = load_sbi_rates()
     except Exception as e:
-        print(f"Error loading rates CSV: {e}")
+        print(f"Error loading rates: {e}")
         return
 
     # 2. Load Excel sheets
