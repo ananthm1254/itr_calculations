@@ -110,13 +110,24 @@ Date       | Type    | ESPP value | RSU value
 
 Generated file `ITR_Calculated_Values.xlsx` contains:
 
-1. **Dividend_Calculated** - Dividends with INR conversion
-2. **ESPP_Buy_Calculated** / **ESPP_Sale_Calculated** - Transactions with exchange rates
-3. **ESPP_Matched_Transactions** - FIFO-matched sales with capital gains (LTCG/STCG)
-4. **RSU_Vest_Calculated** / **RSU_Sale_Calculated** / **RSU_Matched_Transactions** - Same as ESPP
-5. **Schedule_FA_ESPP_Details** / **Schedule_FA_ESPP_Summary** - ESPP asset transactions and summary
-6. **Schedule_FA_RSU_Details** / **Schedule_FA_RSU_Summary** - RSU asset transactions and summary
-7. **Cash_Details** / **Cash_Summary** - Combined ESPP+RSU portfolio values and peak calculation
+1. **Summary** - Comprehensive ITR summary (first sheet)
+   - Dividend income with India tax (31.2%)
+   - Dividend quarterly breakdown (Q1-Q4, with 16-31 Mar separately)
+   - LTCG summary (combined ESPP+RSU): Sale proceeds, purchase cost, total gain
+   - LTCG quarterly breakdown
+   - STCG summary (combined ESPP+RSU): Sale proceeds, purchase cost, total gain
+   - STCG quarterly breakdown
+   - Schedule FA - ESPP: Opening, Peak, Closing values, Positive cash
+   - Schedule FA - RSU: Opening, Peak, Closing values, Positive cash
+   - Schedule FA - Cash: Combined portfolio opening, peak, closing values
+   
+2. **Dividend_Calculated** - Dividends with INR conversion
+3. **ESPP_Buy_Calculated** / **ESPP_Sale_Calculated** - Transactions with exchange rates
+4. **ESPP_Matched_Transactions** - FIFO-matched sales with capital gains (LTCG/STCG)
+5. **RSU_Vest_Calculated** / **RSU_Sale_Calculated** / **RSU_Matched_Transactions** - Same as ESPP
+6. **Schedule_FA_ESPP_Details** / **Schedule_FA_ESPP_Summary** - ESPP asset transactions and summary
+7. **Schedule_FA_RSU_Details** / **Schedule_FA_RSU_Summary** - RSU asset transactions and summary
+8. **Cash_Details** / **Cash_Summary** - Combined ESPP+RSU portfolio values and peak calculation
 
 ---
 

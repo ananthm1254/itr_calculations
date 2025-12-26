@@ -630,6 +630,164 @@ def process_cash_sheet(df, rates_df, ticker_symbol='MU'):
     return pd.DataFrame(results), summary
 
 
+def create_summary_sheet(dividend_df, espp_matched_df, rsu_matched_df, 
+                         schedule_fa_espp_summary, schedule_fa_rsu_summary, cash_summary):
+    """
+    Create a comprehensive summary sheet with all ITR-relevant information.
+    All values in INR.
+    """
+    summary_data = []
+    
+    # 1. Dividend Summary
+    if not dividend_df.empty:
+        total_dividend = dividend_df['Value (INR)'].sum()
+        total_tax_foreign = dividend_df['Tax (INR)'].sum()
+        india_tax = total_dividend * 0.312  # 31.2% of total dividend
+        
+        summary_data.append({'Section': 'DIVIDEND INCOME', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Total Dividend Income', 'Value (INR)': round(total_dividend, 2)})
+        summary_data.append({'Section': '', 'Item': 'Foreign Tax Paid', 'Value (INR)': round(total_tax_foreign, 2)})
+        summary_data.append({'Section': '', 'Item': 'India Tax (31.2%)', 'Value (INR)': round(india_tax, 2)})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+        
+        # 2. Quarterly Dividend Breakdown
+        summary_data.append({'Section': 'DIVIDEND - QUARTERLY BREAKDOWN', 'Item': '', 'Value (INR)': ''})
+        
+        # Add fiscal year column
+        dividend_df['FY_Quarter'] = dividend_df['Transaction Date'].apply(lambda x: get_fy_quarter(x))
+        
+        quarters = ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)', 'Q4-Part (16-31 Mar)']
+        for quarter in quarters:
+            if quarter == 'Q4-Part (16-31 Mar)':
+                # Special handling for 16-31 March
+                q4_part = dividend_df[dividend_df['Transaction Date'].apply(
+                    lambda x: x.month == 3 and x.day >= 16)]
+                if not q4_part.empty:
+                    q_value = q4_part['Value (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_value, 2)})
+            else:
+                q_data = dividend_df[dividend_df['FY_Quarter'] == quarter]
+                if not q_data.empty:
+                    q_value = q_data['Value (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_value, 2)})
+        
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    # 3. LTCG Summary (Combined ESPP + RSU)
+    espp_ltcg = espp_matched_df[espp_matched_df['Gain Type'] == 'LTCG'] if not espp_matched_df.empty else pd.DataFrame()
+    rsu_ltcg = rsu_matched_df[rsu_matched_df['Gain Type'] == 'LTCG'] if not rsu_matched_df.empty else pd.DataFrame()
+    combined_ltcg = pd.concat([espp_ltcg, rsu_ltcg], ignore_index=True)
+    
+    if not combined_ltcg.empty:
+        ltcg_sales = combined_ltcg['Total Sale Proceeds (INR)'].sum()
+        ltcg_purchase = combined_ltcg['Total Purchase Cost (INR)'].sum()
+        ltcg_gain = combined_ltcg['Capital Gain/Loss (INR)'].sum()
+        
+        summary_data.append({'Section': 'LONG TERM CAPITAL GAINS (LTCG)', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Total Sale Proceeds', 'Value (INR)': round(ltcg_sales, 2)})
+        summary_data.append({'Section': '', 'Item': 'Total Purchase Cost', 'Value (INR)': round(ltcg_purchase, 2)})
+        summary_data.append({'Section': '', 'Item': 'Total LTCG', 'Value (INR)': round(ltcg_gain, 2)})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+        
+        # 4. Quarterly LTCG Breakdown (gain only)
+        summary_data.append({'Section': 'LTCG - QUARTERLY BREAKDOWN', 'Item': '', 'Value (INR)': ''})
+        combined_ltcg['FY_Quarter'] = combined_ltcg['Sale Date'].apply(lambda x: get_fy_quarter(x))
+        
+        for quarter in quarters:
+            if quarter == 'Q4-Part (16-31 Mar)':
+                q4_part = combined_ltcg[combined_ltcg['Sale Date'].apply(
+                    lambda x: x.month == 3 and x.day >= 16)]
+                if not q4_part.empty:
+                    q_gain = q4_part['Capital Gain/Loss (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_gain, 2)})
+            else:
+                q_data = combined_ltcg[combined_ltcg['FY_Quarter'] == quarter]
+                if not q_data.empty:
+                    q_gain = q_data['Capital Gain/Loss (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_gain, 2)})
+        
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    # 5. STCG Summary (Combined ESPP + RSU)
+    espp_stcg = espp_matched_df[espp_matched_df['Gain Type'] == 'STCG'] if not espp_matched_df.empty else pd.DataFrame()
+    rsu_stcg = rsu_matched_df[rsu_matched_df['Gain Type'] == 'STCG'] if not rsu_matched_df.empty else pd.DataFrame()
+    combined_stcg = pd.concat([espp_stcg, rsu_stcg], ignore_index=True)
+    
+    if not combined_stcg.empty:
+        stcg_sales = combined_stcg['Total Sale Proceeds (INR)'].sum()
+        stcg_purchase = combined_stcg['Total Purchase Cost (INR)'].sum()
+        stcg_gain = combined_stcg['Capital Gain/Loss (INR)'].sum()
+        
+        summary_data.append({'Section': 'SHORT TERM CAPITAL GAINS (STCG)', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Total Sale Proceeds', 'Value (INR)': round(stcg_sales, 2)})
+        summary_data.append({'Section': '', 'Item': 'Total Purchase Cost', 'Value (INR)': round(stcg_purchase, 2)})
+        summary_data.append({'Section': '', 'Item': 'Total STCG', 'Value (INR)': round(stcg_gain, 2)})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+        
+        # 6. Quarterly STCG Breakdown (gain only)
+        summary_data.append({'Section': 'STCG - QUARTERLY BREAKDOWN', 'Item': '', 'Value (INR)': ''})
+        combined_stcg['FY_Quarter'] = combined_stcg['Sale Date'].apply(lambda x: get_fy_quarter(x))
+        
+        for quarter in quarters:
+            if quarter == 'Q4-Part (16-31 Mar)':
+                q4_part = combined_stcg[combined_stcg['Sale Date'].apply(
+                    lambda x: x.month == 3 and x.day >= 16)]
+                if not q4_part.empty:
+                    q_gain = q4_part['Capital Gain/Loss (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_gain, 2)})
+            else:
+                q_data = combined_stcg[combined_stcg['FY_Quarter'] == quarter]
+                if not q_data.empty:
+                    q_gain = q_data['Capital Gain/Loss (INR)'].sum()
+                    summary_data.append({'Section': '', 'Item': quarter, 'Value (INR)': round(q_gain, 2)})
+        
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    # 7. Schedule FA - ESPP
+    if schedule_fa_espp_summary:
+        summary_data.append({'Section': 'SCHEDULE FA - ESPP', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Opening Value', 'Value (INR)': schedule_fa_espp_summary['Opening Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Peak Value', 'Value (INR)': schedule_fa_espp_summary['Peak Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Closing Value', 'Value (INR)': schedule_fa_espp_summary['Closing Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Positive Cash Total', 'Value (INR)': schedule_fa_espp_summary['Positive Cash Total (INR)']})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    # 8. Schedule FA - RSU
+    if schedule_fa_rsu_summary:
+        summary_data.append({'Section': 'SCHEDULE FA - RSU', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Opening Value', 'Value (INR)': schedule_fa_rsu_summary['Opening Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Peak Value', 'Value (INR)': schedule_fa_rsu_summary['Peak Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Closing Value', 'Value (INR)': schedule_fa_rsu_summary['Closing Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Positive Cash Total', 'Value (INR)': schedule_fa_rsu_summary['Positive Cash Total (INR)']})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    # 9. Cash Component (Combined Portfolio)
+    if cash_summary:
+        summary_data.append({'Section': 'SCHEDULE FA - CASH (Combined Portfolio)', 'Item': '', 'Value (INR)': ''})
+        summary_data.append({'Section': '', 'Item': 'Opening Value', 'Value (INR)': cash_summary['Opening Combined (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Peak Value', 'Value (INR)': cash_summary['Peak Combined Value (INR)']})
+        summary_data.append({'Section': '', 'Item': 'Closing Value', 'Value (INR)': cash_summary['Closing Combined (INR)']})
+        summary_data.append({'Section': '', 'Item': '', 'Value (INR)': ''})
+    
+    return pd.DataFrame(summary_data)
+
+
+def get_fy_quarter(date):
+    """
+    Get fiscal year quarter for Indian FY (Apr-Mar).
+    Returns Q1 (Apr-Jun), Q2 (Jul-Sep), Q3 (Oct-Dec), Q4 (Jan-Mar)
+    """
+    month = date.month
+    if 4 <= month <= 6:
+        return 'Q1 (Apr-Jun)'
+    elif 7 <= month <= 9:
+        return 'Q2 (Jul-Sep)'
+    elif 10 <= month <= 12:
+        return 'Q3 (Oct-Dec)'
+    else:  # 1-3
+        return 'Q4 (Jan-Mar)'
+
+
 
 def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
     # Use provided paths or defaults
@@ -882,7 +1040,22 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
     
     # 4. Save to Excel with multiple sheets
     try:
+        # Create summary sheet
+        print("\n=== Creating Summary Sheet ===")
+        summary_sheet = create_summary_sheet(
+            dividend_results, 
+            espp_matched, 
+            rsu_matched,
+            schedule_fa_espp_summary,
+            schedule_fa_rsu_summary,
+            cash_summary
+        )
+        
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            # Write Summary as the FIRST sheet
+            summary_sheet.to_excel(writer, sheet_name='Summary', index=False)
+            
+            # Write all other sheets
             dividend_results.to_excel(writer, sheet_name='Dividend_Calculated', index=False)
             espp_buy_results.to_excel(writer, sheet_name='ESPP_Buy_Calculated', index=False)
             espp_sale_results.to_excel(writer, sheet_name='ESPP_Sale_Calculated', index=False)
@@ -916,6 +1089,7 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
                 summary_df.to_excel(writer, sheet_name='Cash_Summary', index=False)
         
         print(f"\n✓ Successfully saved calculated data to: {output_path}")
+        print(f"  - Summary: {len(summary_sheet)} rows")
         print(f"  - Dividend_Calculated: {len(dividend_results)} rows")
         print(f"  - ESPP_Buy_Calculated: {len(espp_buy_results)} rows")
         print(f"  - ESPP_Sale_Calculated: {len(espp_sale_results)} rows")
