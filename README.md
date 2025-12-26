@@ -89,6 +89,19 @@ Date       | Cash/Share | No. of Shares | Cash (in $) | Market Value (in $)
 
 **Row Types**: Opening (year start), Closing (year end), Share (additions), Cash (deposits/fees)
 
+### 5. RSU-Assets (Schedule FA)
+Same format as ESPP-Assets sheet.
+
+### 6. Cash (Combined Portfolio)
+```
+Date       | Type    | ESPP value | RSU value
+01/01/2023 | Opening | 4.99       | 0.0
+19/01/2023 | Cash    | 2.73       |
+31/12/2023 | Closing | 21.85      | 0.0
+```
+
+**Row Types**: Opening (year start), Closing (year end), Cash (cash transactions for ESPP/RSU)
+
 **Date Format**: DD/MM/YYYY
 
 ---
@@ -101,8 +114,9 @@ Generated file `ITR_Calculated_Values.xlsx` contains:
 2. **ESPP_Buy_Calculated** / **ESPP_Sale_Calculated** - Transactions with exchange rates
 3. **ESPP_Matched_Transactions** - FIFO-matched sales with capital gains (LTCG/STCG)
 4. **RSU_Vest_Calculated** / **RSU_Sale_Calculated** / **RSU_Matched_Transactions** - Same as ESPP
-5. **Schedule_FA_Details** - All asset transactions in INR
-6. **Schedule_FA_Summary** - Opening, Closing, Peak values, and Positive Cash Total
+5. **Schedule_FA_ESPP_Details** / **Schedule_FA_ESPP_Summary** - ESPP asset transactions and summary
+6. **Schedule_FA_RSU_Details** / **Schedule_FA_RSU_Summary** - RSU asset transactions and summary
+7. **Cash_Details** / **Cash_Summary** - Combined ESPP+RSU portfolio values and peak calculation
 
 ---
 
@@ -133,6 +147,21 @@ Sale: 20 shares (2024-03-25)
 2. Fetch daily stock prices for the year
 3. Calculate: `max(Daily Price × Shares Held)`
 4. Convert to INR using peak date's exchange rate
+
+### Cash Sheet Peak Value
+For the combined portfolio (Cash sheet):
+1. Track cash balance timeline (Opening + Cash transactions + Closing)
+2. Convert each entry to INR using that date's exchange rate
+3. Find maximum INR value across all timeline entries
+4. Report the date and value with highest INR amount
+
+**Note**: Peak is based on maximum INR value, not USD value, since exchange rates vary.
+
+**Example**:
+```
+2023-10-25: $21.85 @ 82.68 = ₹1,806.56
+2023-12-31: $21.85 @ 82.78 = ₹1,808.74 ← Peak (higher INR)
+```
 
 ---
 

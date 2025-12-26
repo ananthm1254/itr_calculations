@@ -457,6 +457,178 @@ def process_schedule_fa(df, rates_df, ticker_symbol='MU'):
     
     return pd.DataFrame(results), summary
 
+def process_cash_sheet(df, rates_df, ticker_symbol='MU'):
+    """
+    Process Cash sheet to calculate combined ESPP and RSU portfolio values.
+    Calculates closing value and peak value for the combined portfolio.
+    """
+    results = []
+    opening_date = None
+    closing_date = None
+    opening_espp = 0
+    opening_rsu = 0
+    closing_espp = 0
+    closing_rsu = 0
+    
+    # Track cash transactions for timeline
+    cash_transactions = []
+    
+    # Get column names (handle potential unnamed columns)
+    cols = df.columns.tolist()
+    date_col = cols[0]  # First column is Date
+    type_col = cols[1]  # Second column is type (Opening/Closing/Cash)
+    espp_col = cols[2]  # Third column is ESPP value
+    rsu_col = cols[3]   # Fourth column is RSU value
+    
+    # Process each row
+    for idx, row in df.iterrows():
+        try:
+            date_val = pd.to_datetime(row[date_col], dayfirst=True)
+        except:
+            continue
+        
+        row_type = str(row[type_col]).strip() if pd.notna(row[type_col]) else ''
+        espp_val = pd.to_numeric(row[espp_col], errors='coerce')
+        espp_val = 0 if pd.isna(espp_val) else espp_val
+        rsu_val = pd.to_numeric(row[rsu_col], errors='coerce')
+        rsu_val = 0 if pd.isna(rsu_val) else rsu_val
+        
+        # Get exchange rate for this date
+        rate, found_date = get_exchange_rate(date_val, rates_df)
+        
+        # Handle Opening
+        if row_type.lower() == 'opening':
+            opening_date = date_val
+            opening_espp = espp_val
+            opening_rsu = rsu_val
+            
+        # Handle Closing
+        elif row_type.lower() == 'closing':
+            closing_date = date_val
+            closing_espp = espp_val
+            closing_rsu = rsu_val
+            
+        # Handle Cash transactions
+        elif row_type.lower() == 'cash':
+            cash_transactions.append({
+                'date': date_val,
+                'espp': espp_val,
+                'rsu': rsu_val
+            })
+        
+        # Record transaction
+        combined_val = espp_val + rsu_val
+        results.append({
+            'Date': date_val,
+            'Type': row_type,
+            'ESPP Value (USD)': espp_val,
+            'RSU Value (USD)': rsu_val,
+            'Combined Value (USD)': combined_val,
+            'Exchange Rate': rate if rate else 'N/A',
+            'Combined Value (INR)': round(combined_val * rate, 2) if rate else 0
+        })
+    
+    # Calculate closing value in INR
+    closing_combined_usd = closing_espp + closing_rsu
+    closing_rate, _ = get_exchange_rate(closing_date, rates_df) if closing_date else (None, None)
+    closing_combined_inr = closing_combined_usd * closing_rate if closing_rate else 0
+    
+    # Calculate opening value in INR
+    opening_combined_usd = opening_espp + opening_rsu
+    opening_rate, _ = get_exchange_rate(opening_date, rates_df) if opening_date else (None, None)
+    opening_combined_inr = opening_combined_usd * opening_rate if opening_rate else 0
+    
+    
+    # Calculate peak value - find maximum combined cash value in INR
+    peak_value_inr = 0
+    peak_date = None
+    peak_combined_usd = 0
+    
+    if closing_date and opening_date:
+        # Build cash balance timeline with INR conversions
+        cash_timeline = []
+        current_espp_cash = opening_espp
+        current_rsu_cash = opening_rsu
+        
+        print(f"\nCalculating peak value for combined portfolio...")
+        
+        # Add opening
+        opening_combined = current_espp_cash + current_rsu_cash
+        opening_rate, _ = get_exchange_rate(opening_date, rates_df)
+        opening_inr = opening_combined * opening_rate if opening_rate else 0
+        cash_timeline.append({
+            'date': opening_date,
+            'espp': current_espp_cash,
+            'rsu': current_rsu_cash,
+            'combined_usd': opening_combined,
+            'rate': opening_rate,
+            'combined_inr': opening_inr
+        })
+        print(f"  Opening: {opening_date.strftime('%Y-%m-%d')} - Combined: ${opening_combined:.2f} @ {opening_rate:.2f} = ₹{opening_inr:,.2f}")
+        
+        # Add cash transactions chronologically
+        for tx in sorted(cash_transactions, key=lambda x: x['date']):
+            current_espp_cash += tx['espp']
+            current_rsu_cash += tx['rsu']
+            combined_usd = current_espp_cash + current_rsu_cash
+            rate, _ = get_exchange_rate(tx['date'], rates_df)
+            combined_inr = combined_usd * rate if rate else 0
+            cash_timeline.append({
+                'date': tx['date'],
+                'espp': current_espp_cash,
+                'rsu': current_rsu_cash,
+                'combined_usd': combined_usd,
+                'rate': rate,
+                'combined_inr': combined_inr
+            })
+            print(f"  {tx['date'].strftime('%Y-%m-%d')}: Combined: ${combined_usd:.2f} @ {rate:.2f} = ₹{combined_inr:,.2f}")
+        
+        # Add closing
+        closing_combined = closing_espp + closing_rsu
+        closing_rate_val, _ = get_exchange_rate(closing_date, rates_df)
+        closing_inr = closing_combined * closing_rate_val if closing_rate_val else 0
+        cash_timeline.append({
+            'date': closing_date,
+            'espp': closing_espp,
+            'rsu': closing_rsu,
+            'combined_usd': closing_combined,
+            'rate': closing_rate_val,
+            'combined_inr': closing_inr
+        })
+        print(f"  Closing: {closing_date.strftime('%Y-%m-%d')} - Combined: ${closing_combined:.2f} @ {closing_rate_val:.2f} = ₹{closing_inr:,.2f}")
+        
+        print(f"Cash timeline has {len(cash_timeline)} entries")
+        
+        # Find maximum INR value
+        max_entry = max(cash_timeline, key=lambda x: x['combined_inr'])
+        peak_date = max_entry['date']
+        peak_combined_usd = max_entry['combined_usd']
+        peak_value_inr = max_entry['combined_inr']
+        
+        print(f"Peak date: {peak_date.strftime('%Y-%m-%d')}")
+        print(f"Peak combined value: ${peak_combined_usd:.2f} = ₹{peak_value_inr:,.2f}")
+
+
+    
+    # Create summary
+    summary = {
+        'Opening Date': opening_date.strftime('%Y-%m-%d') if opening_date else 'N/A',
+        'Opening ESPP (USD)': round(opening_espp, 2),
+        'Opening RSU (USD)': round(opening_rsu, 2),
+        'Opening Combined (USD)': round(opening_combined_usd, 2),
+        'Opening Combined (INR)': round(opening_combined_inr, 2),
+        'Closing Date': closing_date.strftime('%Y-%m-%d') if closing_date else 'N/A',
+        'Closing ESPP (USD)': round(closing_espp, 2),
+        'Closing RSU (USD)': round(closing_rsu, 2),
+        'Closing Combined (USD)': round(closing_combined_usd, 2),
+        'Closing Combined (INR)': round(closing_combined_inr, 2),
+        'Peak Date': peak_date.strftime('%Y-%m-%d') if peak_date else 'N/A',
+        'Peak Combined Value (USD)': round(peak_combined_usd, 2),
+        'Peak Combined Value (INR)': round(peak_value_inr, 2)
+    }
+    
+    return pd.DataFrame(results), summary
+
 
 
 def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
@@ -549,6 +721,18 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             print("\n=== RSU-Assets sheet not found, skipping RSU Schedule FA ===")
         except Exception as e:
             print(f"\n=== Error processing RSU Schedule FA: {e} ===")
+
+        # Process Cash sheet if it exists
+        cash_results = pd.DataFrame()
+        cash_summary = None
+        try:
+            df_cash = pd.read_excel(input_path, sheet_name='Cash')
+            print("\n=== Processing Cash (Combined Portfolio) ===")
+            cash_results, cash_summary = process_cash_sheet(df_cash, rates_df, ticker_symbol)
+        except ValueError:
+            print("\n=== Cash sheet not found, skipping combined portfolio calculation ===")
+        except Exception as e:
+            print(f"\n=== Error processing Cash sheet: {e} ===")
 
         
     except Exception as e:
@@ -669,6 +853,31 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
         else:
             print(f"Peak Value:               Not calculated (yfinance not available)")
         print(f"{'='*60}")
+    
+    # Cash Summary - Combined Portfolio
+    if cash_summary:
+        print(f"\n{'='*60}")
+        print(f"COMBINED PORTFOLIO SUMMARY (ESPP + RSU)")
+        print(f"{'='*60}")
+        print(f"Opening Date:             {cash_summary['Opening Date']}")
+        print(f"  ESPP Value (USD):       ${cash_summary['Opening ESPP (USD)']:>15,.2f}")
+        print(f"  RSU Value (USD):        ${cash_summary['Opening RSU (USD)']:>15,.2f}")
+        print(f"  Combined (USD):         ${cash_summary['Opening Combined (USD)']:>15,.2f}")
+        print(f"  Combined (INR):         ₹{cash_summary['Opening Combined (INR)']:>15,.2f}")
+        print(f"{'-'*60}")
+        print(f"Closing Date:             {cash_summary['Closing Date']}")
+        print(f"  ESPP Value (USD):       ${cash_summary['Closing ESPP (USD)']:>15,.2f}")
+        print(f"  RSU Value (USD):        ${cash_summary['Closing RSU (USD)']:>15,.2f}")
+        print(f"  Combined (USD):         ${cash_summary['Closing Combined (USD)']:>15,.2f}")
+        print(f"  Combined (INR):         ₹{cash_summary['Closing Combined (INR)']:>15,.2f}")
+        print(f"{'-'*60}")
+        if cash_summary['Peak Date'] != 'N/A':
+            print(f"Peak Date:                {cash_summary['Peak Date']}")
+            print(f"  Peak Combined (USD):    ${cash_summary['Peak Combined Value (USD)']:>15,.2f}")
+            print(f"  Peak Combined (INR):    ₹{cash_summary['Peak Combined Value (INR)']:>15,.2f}")
+        else:
+            print(f"Peak Value:               Not calculated")
+        print(f"{'='*60}")
 
     
     # 4. Save to Excel with multiple sheets
@@ -698,6 +907,13 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             if schedule_fa_rsu_summary:
                 summary_df = pd.DataFrame([schedule_fa_rsu_summary])
                 summary_df.to_excel(writer, sheet_name='Schedule_FA_RSU_Summary', index=False)
+            
+            # Add Cash (Combined Portfolio) if available
+            if not cash_results.empty:
+                cash_results.to_excel(writer, sheet_name='Cash_Details', index=False)
+            if cash_summary:
+                summary_df = pd.DataFrame([cash_summary])
+                summary_df.to_excel(writer, sheet_name='Cash_Summary', index=False)
         
         print(f"\n✓ Successfully saved calculated data to: {output_path}")
         print(f"  - Dividend_Calculated: {len(dividend_results)} rows")
@@ -717,6 +933,10 @@ def main(excel_input=None, excel_output=None, ticker_symbol='MU'):
             print(f"  - Schedule_FA_RSU_Details: {len(schedule_fa_rsu_results)} rows")
         if schedule_fa_rsu_summary:
             print(f"  - Schedule_FA_RSU_Summary: 1 row")
+        if not cash_results.empty:
+            print(f"  - Cash_Details: {len(cash_results)} rows")
+        if cash_summary:
+            print(f"  - Cash_Summary: 1 row")
     except Exception as e:
         print(f"Error saving output file: {e}")
         import traceback
